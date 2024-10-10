@@ -1,15 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getDocuments } from '../lib/firebase/firebaseUtils';
-import { format } from 'date-fns';
-
-interface VoiceNote {
-  id: string;
-  text: string;
-  timestamp: string;
-  duration: number;
-}
+import { getVoiceNotes, VoiceNote } from '../lib/firebase/firebaseUtils';
 
 interface VoiceNotesListProps {
   speechId: string;
@@ -17,33 +9,40 @@ interface VoiceNotesListProps {
 
 export default function VoiceNotesList({ speechId }: VoiceNotesListProps) {
   const [voiceNotes, setVoiceNotes] = useState<VoiceNote[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchVoiceNotes = async () => {
-      const fetchedNotes = await getDocuments('voiceNotes');
-      setVoiceNotes(fetchedNotes.map(note => ({
-        id: note.id,
-        text: (note as any).text || '',
-        timestamp: (note as any).timestamp || new Date().toISOString(),
-        duration: (note as any).duration || 0
-      })));
+      try {
+        const notes = await getVoiceNotes(speechId);
+        setVoiceNotes(notes);
+      } catch (err) {
+        console.error('Error fetching voice notes:', err);
+        setError('Failed to load voice notes. Please try again later.');
+      }
     };
     fetchVoiceNotes();
   }, [speechId]);
 
+  if (error) {
+    return <div className="text-red-500">{error}</div>;
+  }
+
   return (
-    <div className="mt-8">
-      <h2 className="text-2xl font-bold mb-4">Voice Notes</h2>
-      <div className="space-y-4">
-        {voiceNotes.map((note) => (
-          <div key={note.id} className="border rounded-lg p-4">
-            <p className="text-sm text-gray-500 mb-2">
-              {format(new Date(note.timestamp), 'PPP p')} - Duration: {Math.floor(note.duration / 60)}:{(note.duration % 60).toString().padStart(2, '0')}
-            </p>
-            <p>{note.text}</p>
-          </div>
-        ))}
-      </div>
+    <div className="text-black">
+      <h2 className="text-xl font-semibold mb-4">Voice Notes</h2>
+      {voiceNotes.length === 0 ? (
+        <p>No voice notes available for this speech.</p>
+      ) : (
+        <ul className="space-y-4">
+          {voiceNotes.map((note) => (
+            <li key={note.id} className="bg-white p-4 rounded-md shadow">
+              <p className="text-sm text-gray-500 mb-2">{new Date(note.timestamp).toLocaleString()}</p>
+              <p>{note.content}</p>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

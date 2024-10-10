@@ -1,46 +1,89 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useDebounce } from '../lib/hooks/useDebounce';
+import { useState, useEffect, useRef } from 'react';
+import VoiceNotesList from './VoiceNotesList';
 
-interface SpeechEditorProps {
-  initialContent: string;
-  onUpdate: (content: string) => void;
+interface Speech {
+  id: string;
+  title: string;
+  content: string;
+  aiInstructions: string;
 }
 
-export default function SpeechEditor({ initialContent, onUpdate }: SpeechEditorProps) {
-  const [content, setContent] = useState(initialContent);
-  const debouncedContent = useDebounce(content, 500);
+interface SpeechEditorProps {
+  speech: Speech;
+  onUpdate: (updatedSpeech: Speech) => void;
+}
+
+export default function SpeechEditor({ speech, onUpdate }: SpeechEditorProps) {
+  const [activeTab, setActiveTab] = useState('editor');
+  const [content, setContent] = useState(speech.content);
+  const [aiInstructions, setAiInstructions] = useState(speech.aiInstructions);
+  const editorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    onUpdate(debouncedContent);
-  }, [debouncedContent, onUpdate]);
+    if (editorRef.current) {
+      highlightComments();
+    }
+  }, [content]);
 
-  const handleBold = () => {
-    setContent((prev) => prev + '**Bold Text**');
+  const highlightComments = () => {
+    if (editorRef.current) {
+      const highlightedContent = content.replace(/<>.*?<\/>/g, match => `<span style="color: #ff6b6b;">${match}</span>`);
+      editorRef.current.innerHTML = highlightedContent.replace(/\n/g, '<br>');
+    }
   };
 
-  const handleItalic = () => {
-    setContent((prev) => prev + '*Italic Text*');
+  const handleEditorChange = () => {
+    if (editorRef.current) {
+      let newContent = editorRef.current.innerHTML;
+      newContent = newContent.replace(/<br>/g, '\n');
+      newContent = newContent.replace(/<[^>]*>/g, '');
+      setContent(newContent);
+      onUpdate({ ...speech, content: newContent });
+    }
   };
 
-  const handleBulletPoint = () => {
-    setContent((prev) => prev + '\n- Bullet Point');
+  const handleAiInstructionsChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setAiInstructions(e.target.value);
+    onUpdate({ ...speech, aiInstructions: e.target.value });
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex space-x-2">
-        <button onClick={handleBold} className="px-2 py-1 bg-gray-200 rounded">B</button>
-        <button onClick={handleItalic} className="px-2 py-1 bg-gray-200 rounded">I</button>
-        <button onClick={handleBulletPoint} className="px-2 py-1 bg-gray-200 rounded">•</button>
+    <div className="text-black">
+      <div className="mb-4">
+        <button
+          className={`mr-2 px-4 py-2 ${activeTab === 'editor' ? 'bg-gray-200' : 'bg-white'}`}
+          onClick={() => setActiveTab('editor')}
+        >
+          Editor
+        </button>
+        <button
+          className={`px-4 py-2 ${activeTab === 'voiceNotes' ? 'bg-gray-200' : 'bg-white'}`}
+          onClick={() => setActiveTab('voiceNotes')}
+        >
+          Voice Notes
+        </button>
       </div>
-      <textarea
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        className="w-full h-64 p-4 border rounded-lg resize-none"
-        placeholder="Start writing your speech..."
-      />
+      {activeTab === 'editor' ? (
+        <>
+          <div
+            ref={editorRef}
+            contentEditable
+            className="w-full h-64 p-4 border rounded-md mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            onInput={handleEditorChange}
+            dangerouslySetInnerHTML={{ __html: content.replace(/\n/g, '<br>') }}
+          />
+          <textarea
+            value={aiInstructions}
+            onChange={handleAiInstructionsChange}
+            placeholder="Audience information, speech length, speech tone, and additional AI instructions"
+            className="w-full p-2 border rounded-md bg-white"
+          />
+        </>
+      ) : (
+        <VoiceNotesList speechId={speech.id} />
+      )}
     </div>
   );
 }

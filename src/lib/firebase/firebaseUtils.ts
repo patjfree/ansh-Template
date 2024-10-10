@@ -11,6 +11,8 @@ import {
   doc,
   updateDoc,
   deleteDoc,
+  query,
+  where,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
@@ -52,3 +54,23 @@ export const uploadFile = async (file: File, path: string) => {
   await uploadBytes(storageRef, file);
   return getDownloadURL(storageRef);
 };
+
+// Add this new function
+export const getVoiceNotes = async (speechId: string): Promise<VoiceNote[]> => {
+  const q = query(collection(db, "voiceNotes"), where("speechId", "==", speechId));
+  const querySnapshot = await getDocs(q);
+  return querySnapshot.docs.map(doc => ({
+    id: doc.id,
+    content: doc.data().content || '',
+    timestamp: doc.data().timestamp || '',
+    // Add any other fields that are part of your VoiceNote interface
+  }));
+};
+
+// Add this interface at the top of the file or in a separate types file
+export interface VoiceNote {
+  id: string;
+  content: string;
+  timestamp: string;
+  // Add any other fields that are part of your VoiceNote data
+}
